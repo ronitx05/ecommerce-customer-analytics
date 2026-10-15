@@ -113,6 +113,7 @@ dashboard/app.py           Streamlit dashboard
 dags/                      Airflow DAG
 cloud/                     Dataproc submission script
 run_pipeline.sh / .ps1      end-to-end local run (macOS-Linux / Windows)
+notebooks/                 step-by-step Jupyter walkthrough (EDA, Spark SQL, MLlib)
 ```
 
 ## References
