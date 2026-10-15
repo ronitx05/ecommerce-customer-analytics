@@ -88,6 +88,16 @@ pip install -r requirements.txt          # needs Java 17+ for Spark
 ./run_pipeline.sh                          # downloads data, builds Bronze/Silver/Gold, trains models (~5 min)
 streamlit run dashboard/app.py             # open http://localhost:8501
 ```
+**Windows (PowerShell):** use `run_pipeline.ps1` instead of `run_pipeline.sh`. One-time setup:
+1. Install **Java 17 or 21** and set `JAVA_HOME`.
+2. Spark needs Hadoop's `winutils.exe` on Windows: download `winutils.exe` and `hadoop.dll` for Hadoop 3.3.x (e.g. from https://github.com/cdarlint/winutils), put them in `C:\hadoop\bin`, and set `HADOOP_HOME=C:\hadoop` (the script picks up `C:\hadoop` automatically).
+3. Run:
+```powershell
+pip install -r requirements.txt
+powershell -ExecutionPolicy Bypass -File .\run_pipeline.ps1
+streamlit run dashboard\app.py
+```
+
 **Google Cloud Dataproc:** `PROJECT_ID=<your-project> ./cloud/dataproc_submit.sh` creates a bucket and single-node cluster, runs all four PySpark jobs against GCS (`--data-dir=gs://...`), copies results back and deletes the cluster.
 
 **Airflow:** copy `dags/ecommerce_pipeline_dag.py` into your Airflow `dags/` folder and set `PROJECT_DIR`; the DAG runs `ingest_bronze >> clean_silver >> build_gold >> train_mllib_models` daily.
@@ -102,7 +112,7 @@ src/04_ml.py               MLlib K-Means + ALS -> predictions
 dashboard/app.py           Streamlit dashboard
 dags/                      Airflow DAG
 cloud/                     Dataproc submission script
-run_pipeline.sh            end-to-end local run
+run_pipeline.sh / .ps1      end-to-end local run (macOS-Linux / Windows)
 ```
 
 ## References
