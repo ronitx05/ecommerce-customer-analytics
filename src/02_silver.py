@@ -10,7 +10,7 @@ import os
 
 from pyspark.sql import functions as F
 
-from config import BRONZE_DIR, SILVER_DIR, get_spark
+from config import BRONZE_DIR, SILVER_DIR, get_spark, write_json
 
 
 def main():
@@ -57,8 +57,7 @@ def main():
     report["silver_sales_rows"] = spark.read.parquet(os.path.join(SILVER_DIR, "sales")).count()
     report["silver_cancellation_rows"] = cancellations.count()
     report["removed_rows"] = report["bronze_rows"] - report["silver_sales_rows"] - report["silver_cancellation_rows"]
-    with open(os.path.join(SILVER_DIR, "quality_report.json"), "w") as f:
-        json.dump(report, f, indent=2)
+    write_json(report, os.path.join(SILVER_DIR, "quality_report.json"))
     print(json.dumps(report, indent=2))
     spark.stop()
 

@@ -17,6 +17,8 @@ CSV_PATH = os.path.join(RAW_DIR, "online_retail_ii.csv")
 
 
 def land_raw():
+    if RAW_DIR.startswith("gs://"):  # on Dataproc the CSV is uploaded to GCS beforehand
+        return
     os.makedirs(RAW_DIR, exist_ok=True)
     if not os.path.exists(ZIP_PATH):
         print(f"Downloading {DATASET_URL}")
