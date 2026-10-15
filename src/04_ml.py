@@ -16,7 +16,7 @@ from pyspark.ml.recommendation import ALS
 from pyspark.sql import Window
 from pyspark.sql import functions as F
 
-from config import SILVER_DIR, GOLD_DIR, get_spark
+from config import SILVER_DIR, GOLD_DIR, get_spark, write_json
 
 PRED_DIR = os.path.join(GOLD_DIR, "predictions")
 SEED = 42
@@ -117,8 +117,7 @@ def main():
     metrics = {}
     segment_customers(spark, metrics)
     recommend_products(spark, metrics)
-    with open(os.path.join(GOLD_DIR, "metrics.json"), "w") as f:
-        json.dump(metrics, f, indent=2)
+    write_json(metrics, os.path.join(GOLD_DIR, "metrics.json"))
     print(json.dumps(metrics, indent=2))
     spark.stop()
 
