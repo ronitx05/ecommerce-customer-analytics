@@ -3,11 +3,13 @@
 - casts types (quantity, price, timestamp, customer id)
 - trims text and standardises descriptions / countries
 - removes exact duplicates, invalid records (null customer, qty/price <= 0)
-- separates cancellations (invoice starting with 'C') into their own table
+- separates cancellations (invoice starting with 'C') into their own table and removes
+  the sale lines they cancel, so the sales table holds net purchases only
 """
 import json
 import os
 
+from pyspark.sql import Window
 from pyspark.sql import functions as F
 
 from config import BRONZE_DIR, SILVER_DIR, get_spark, write_json
@@ -51,12 +53,26 @@ def main():
     )
     cancellations = valid.filter(F.col("is_cancelled")).drop("is_cancelled")
 
+    # Net out cancellations: each cancellation line removes one sale line with the same customer,
+    # product, price and quantity (matched one-to-one, most recent first) using ROW_NUMBER windows
+    key = ["customer_id", "stock_code", "price", "quantity"]
+    sales_ranked = sales.withColumn("match_rn", F.row_number().over(Window.partitionBy(*key).orderBy(F.desc("invoice_ts"))))
+    cancelled_keys = (
+        cancellations.withColumn("quantity", -F.col("quantity"))
+        .withColumn("match_rn", F.row_number().over(Window.partitionBy(*key).orderBy(F.desc("invoice_ts"))))
+        .select(*key, "match_rn")
+    )
+    gross_rows = sales.count()
+    sales = sales_ranked.join(cancelled_keys, key + ["match_rn"], "left_anti").drop("match_rn")
+
     sales.write.mode("overwrite").partitionBy("year_month").parquet(os.path.join(SILVER_DIR, "sales"))
     cancellations.write.mode("overwrite").parquet(os.path.join(SILVER_DIR, "cancellations"))
 
     report["silver_sales_rows"] = spark.read.parquet(os.path.join(SILVER_DIR, "sales")).count()
+    report["sales_lines_removed_by_cancellations"] = gross_rows - report["silver_sales_rows"]
     report["silver_cancellation_rows"] = cancellations.count()
-    report["removed_rows"] = report["bronze_rows"] - report["silver_sales_rows"] - report["silver_cancellation_rows"]
+    report["removed_rows"] = (report["bronze_rows"] - report["silver_sales_rows"] - report["silver_cancellation_rows"]
+                              - report["sales_lines_removed_by_cancellations"])
     write_json(report, os.path.join(SILVER_DIR, "quality_report.json"))
     print(json.dumps(report, indent=2))
     spark.stop()

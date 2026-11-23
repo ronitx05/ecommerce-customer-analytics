@@ -34,7 +34,7 @@ UCI zip (Excel) ──► data/raw (CSV landing)
         │  01_ingest_bronze.py   (PySpark)
         ▼
 Bronze  data/bronze      raw strings + source_system / source_file / ingested_at
-        │  02_silver.py          (type casting, dedup, invalid & non-product rows removed, cancellations split)
+        │  02_silver.py          (type casting, dedup, invalid & non-product rows removed, cancellations netted out)
         ▼
 Silver  data/silver/sales (partitioned by year_month), data/silver/cancellations, quality_report.json
         │  03_gold.py            (Spark SQL, joins, aggregations, window functions)
@@ -64,21 +64,25 @@ Streamlit dashboard (dashboard/app.py)      Orchestration: run_pipeline.sh · Ai
 |---|---|
 | Bronze (raw) | 1,067,371 |
 | After removing exact duplicates | 1,033,036 |
-| Clean sales lines (valid customer, qty > 0, price > 0, real products) | 776,579 |
+| Valid sales lines (valid customer, qty > 0, price > 0, real products) | 776,579 |
+| Sale lines removed because they were later cancelled | 6,609 |
+| **Net sales lines (Silver)** | **769,970** |
 | Cancellation lines (stored separately) | 17,602 |
 
-## Results
-**Business KPIs:** £17.07M revenue · 36,594 orders · 5,852 customers · 4,620 products · 41 countries · AOV £466.43. Revenue is strongly seasonal, peaking every November (pre-Christmas).
+Each cancellation line removes the matching sale (same customer, product, quantity and price), so revenue and customer spend are **net** of cancellations. Without this, mistakes such as an order of 74,215 storage jars that was cancelled minutes later would count as real spend.
 
-**Customer segmentation (K-Means, k chosen by silhouette: k=3→0.505, 4→0.529, 5→0.510, 6→0.501):**
+## Results
+**Business KPIs:** £16.51M net revenue · 36,264 orders · 5,835 customers · 4,611 products · 41 countries · AOV £455.32. Revenue is strongly seasonal, peaking every November (pre-Christmas).
+
+**Customer segmentation (K-Means, k chosen by silhouette: k=3→0.506, 4→0.534, 5→0.509, 6→0.468):**
 | Cluster | Customers | Avg recency (days) | Avg orders | Avg spend (£) |
 |---|---|---|---|---|
-| High-Value Loyal | 1,165 | 29 | 19.4 | 10,727 |
-| Mid-Value Slipping | 1,430 | 238 | 5.0 | 1,945 |
-| Recent Low-Spend | 1,283 | 28 | 3.3 | 919 |
-| Lapsed / Lost | 1,974 | 388 | 1.4 | 310 |
+| High-Value Loyal | 1,145 | 27 | 19.4 | 10,472 |
+| Mid-Value Slipping | 1,435 | 219 | 5.2 | 1,968 |
+| Recent Low-Spend | 1,256 | 29 | 3.0 | 832 |
+| Lapsed / Lost | 1,999 | 396 | 1.4 | 327 |
 
-**Recommendations (ALS, implicit feedback, 80/20 hold-out):** 5,852 users × 4,620 items, 480,973 interactions. Hit-rate@10 = **0.499** (half of customers had at least one of their actual future products in the top-10), precision@10 = 0.076, MAP@10 = 0.046. Final model recommends the top-5 *unseen* products for every customer.
+**Recommendations (ALS, implicit feedback, 80/20 hold-out):** 5,835 users × 4,611 items, 477,923 interactions. Hit-rate@10 = **0.503** (half of customers had at least one of their actual future products in the top-10), precision@10 = 0.076, MAP@10 = 0.043. Final model recommends the top-5 *unseen* products for every customer.
 
 **Business recommendations:** retain *High-Value Loyal* customers with loyalty perks; run win-back campaigns for *Mid-Value Slipping* customers; use ALS cross-sell recommendations for *Recent Low-Spend* customers to grow basket size; time campaigns ahead of the Q4 peak.
 
